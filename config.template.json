@@ -1,0 +1,17 @@
+{
+    "local": {
+        "token_path": "path_to_local_token",
+        "credentials_path": "path_to_local_credentials",
+        "db_connection_string": "local_database_connection_string_here"
+    },
+    "development": {
+        "token_path": "path_to_dev_token",
+        "credentials_path": "path_to_dev_credentials",
+        "db_connection_string": "development_database_connection_string_here"
+    },
+    "production": {
+        "token_path": "path_to_prod_token",
+        "credentials_path": "path_to_prod_credentials",
+        "db_connection_string": "production_database_connection_string_here"
+    }
+}
