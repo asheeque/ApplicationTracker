@@ -1,0 +1,20 @@
+# Ignore IPython Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore log files
+app.log
+
+# Ignore Python compiled files and cache
+__pycache__/
+*.pyc
+
+# Ignore data directory
+
+# Ignore specific text files
+latest_timestamp.txt
+output_cleaned.csv
+output_predicted.csv
+output_test.csv
+
+# Ignore configuration files (if you don't want to share your configuration publicly)
+config.json
