@@ -25,14 +25,15 @@ class EmailFetcher:
         self.SCOPES = self.config.get("SCOPES", ['https://www.googleapis.com/auth/gmail.readonly'])
         logging.info("EmailFetcher initialized with given config.")
 
-    def get_service(self):
+    def get_service(self,token=None):
         try:
             creds = None
-            token_path = os.path.expanduser(
-                self.config.get("token_path", TOKEN_PATH))
-            # print(token_path)
-            if os.path.exists(token_path):
-                creds = Credentials.from_authorized_user_file(token_path)
+            if token:
+                creds = Credentials(token=token)
+            else:
+                token_path = os.path.expanduser(self.config.get("token_path", TOKEN_PATH))
+                if os.path.exists(token_path):
+                    creds = Credentials.from_authorized_user_file(token_path)
             
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
@@ -102,11 +103,19 @@ class EmailFetcher:
         except Exception as e:
             logging.error(f"Error listing messages with labels: {e}")
             return []
-    
+
+    def fetch_email_data(self,gmail_service, message_id):
+        try:
+            return gmail_service.users().messages().get(userId='me', id=message_id).execute()
+        except Exception as e:
+            logging.error(f"Error fetching data for message ID {message_id}: {e}")
+            return None
+        
     def datetime_handler(self,x):
         if isinstance(x, datetime):
             return x.strftime('%Y-%m-%d %H:%M:%S')
         raise TypeError("Unknown type")
+      
     
     def one_message_data_processing(self,data):
 
@@ -164,7 +173,9 @@ class EmailFetcher:
 
         # Handle simple emails without multipart
         if not parts:
-            body_data = payload['body']['data']
+            body_data = payload['body'].get('data') 
+            if not body_data:
+                return ''
             decoded_bytes = base64.urlsafe_b64decode(body_data.encode('ASCII'))
             text = decoded_bytes.decode('utf-8')
             return text
@@ -174,53 +185,85 @@ class EmailFetcher:
         for part in parts:
             mime_type = part['mimeType']
             if mime_type == 'text/plain' or mime_type == 'text/html':
-                body_data = part['body']['data']
+                body_data = payload['body'].get('data') 
+                if not body_data:
+                    return ''
                 decoded_bytes = base64.urlsafe_b64decode(body_data.encode('ASCII'))
                 text = decoded_bytes.decode('utf-8')
                 email_content.append(text)
 
         return "\n".join(email_content)
 
-def initialize_fetcher():
+    def fetch_emails_with_date_range(self, gmail_service, from_date=None, to_date=None):
+        # Convert datetime objects to string
+        if from_date:
+            from_date_str = from_date.strftime('%Y/%m/%d')
+        if to_date:
+            to_date_str = to_date.strftime('%Y/%m/%d')
+
+        # Construct queries based on provided dates
+        queries = []
+        if from_date and to_date:
+            queries.append(f"label:inbox after:{from_date_str} before:{to_date_str}")
+            queries.append(f"label:Applications after:{from_date_str} before:{to_date_str}")
+        else:
+            # Use the previous logic if dates are not provided
+            default_after_date = datetime.strptime("2023-08-17 00:00:00", '%Y-%m-%d %H:%M:%S')
+            after_date = self.get_after_date_from_latest_timestamp(default_after_date)
+            after_date_str = after_date.strftime('%Y/%m/%d')
+            queries.append(f"label:inbox after:{after_date_str}")
+            queries.append(f"label:Applications after:{after_date_str}")
+        all_messages = []
+        for query in queries:
+            all_messages.extend(fetcher.list_messages_with_labels(gmail_service, query=query))
+        
+        unique_messages_by_id = {message['id']: message for message in all_messages}
+        return list(unique_messages_by_id.values())
+    
+    def fetch_and_process_emails(self, gmail_service,messages):
+        all_messages_data = [self.fetch_email_data(gmail_service, msg['id']) for msg in messages]
+        processed_emails = [self.one_message_data_processing(msg_data) for msg_data in all_messages_data]
+        # self.save_latest_timestamp(all_messages_data)
+        return processed_emails
+
+
+def initialize_fetcher(token=None):
     fetcher = EmailFetcher()
-    gmail_service = fetcher.get_service()
+    gmail_service = fetcher.get_service(token)
     if not gmail_service:
         logging.error("Failed to obtain Gmail service. Exiting program.")
         return
     return fetcher, gmail_service
 
-def fetch_emails(fetcher, gmail_service):
-    default_after_date = datetime.strptime("2023-08-11 15:48:03", '%Y-%m-%d %H:%M:%S')
-    after_date = fetcher.get_after_date_from_latest_timestamp(default_after_date)
-    after_date_str = after_date.strftime('%Y/%m/%d')
-    
-    queries = [f"label:inbox after:{after_date_str}", f"label:Applications after:{after_date_str}"]
 
-    all_messages = []
-    for query in queries:
-        all_messages.extend(fetcher.list_messages_with_labels(gmail_service, query=query))
     
-    unique_messages_by_id = {message['id']: message for message in all_messages}
-    return list(unique_messages_by_id.values())
-
-def process_and_save_emails(fetcher, gmail_service, messages):
-    all_messages_data = [gmail_service.users().messages().get(userId='me', id=msg['id']).execute() for msg in messages]
-    processed_emails = [fetcher.one_message_data_processing(msg_data) for msg_data in all_messages_data]
-    fetcher.save_latest_timestamp(all_messages_data)
-    
-    with open('output_test.csv', 'w', newline='') as csvfile:
-        fieldnames = processed_emails[0].keys()
+def save_emails_to_csv(emails):
+    with open('output_new.csv', 'w', newline='') as csvfile:
+        fieldnames = emails[0].keys()
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        for data in processed_emails:
-            writer.writerow(data)
+        for email in emails:
+            writer.writerow(email)
 
 
-if __name__ == "__main__":
+
+# if __name__ == "__main__":
+#     logging.basicConfig(level=logging.INFO)
+#     fetcher, gmail_service = initialize_fetcher()
+
+#     if fetcher and gmail_service:
+#         messages = fetcher.fetch_emails_with_date_range(gmail_service)
+#         process_and_save_emails(fetcher, gmail_service, messages)
+#         logging.info(f"Processed {len(messages)} emails.")
+
+if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     fetcher, gmail_service = initialize_fetcher()
 
     if fetcher and gmail_service:
-        messages = fetch_emails(fetcher, gmail_service)
-        process_and_save_emails(fetcher, gmail_service, messages)
+        messages = fetcher.fetch_emails_with_date_range(gmail_service)
+        emails = fetcher.fetch_and_process_emails(gmail_service,messages)
+
+        # If used as a standalone script, save to CSV
+        save_emails_to_csv(emails)
         logging.info(f"Processed {len(messages)} emails.")

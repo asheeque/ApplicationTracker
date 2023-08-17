@@ -1,24 +1,24 @@
-import logo from './logo.svg';
 import './App.css';
+import Navigation from './routes/navigation/Navigation.component';
+import Authentication from './routes/authentication/Authentication.component';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import Privateroute from './routes/authentication/Privateroute.component';
+import Dashboard from './routes/dashboard/Dashboard.component';
+import Home from './routes/home/Home.component';
 
 function App() {
+  const token = localStorage.getItem('token');
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Routes>
+      <Route path="/" element={<Navigation />}>
+        <Route index element={<Home/>}/>
+        <Route path='login' element={<Authentication />} />
+        <Route path="dashboard" element={<Privateroute />}>
+          <Route index element={<Dashboard />} />
+        </Route>
+      </Route>
+    </Routes>
   );
 }
 

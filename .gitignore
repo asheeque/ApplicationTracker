@@ -46,3 +46,14 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+
+#backend
+.venv
+.env
+build
+ApplicationTracker.egg-info
+application_tracker_library/output_new.csv
+application_tracker_library/application_tracker/email_test.py
+flask_application_tracker/requirementsap.txt
+flask_application_tracker/requirements_copy.txt
