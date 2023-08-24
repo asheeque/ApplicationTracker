@@ -1,9 +1,9 @@
 import './App.css';
-import Navigation from './routes/navigation/Navigation.component';
-import Authentication from './routes/authentication/Authentication.component';
+import Navigation from './routes/navigation/NavigationScreen';
+import Authentication from './routes/authentication/AuthenticationScreen';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Privateroute from './routes/authentication/Privateroute.component';
-import Dashboard from './routes/dashboard/Dashboard.component';
+import Dashboard from './routes/dashboard/DashboardScreen';
 import Home from './routes/home/Home.component';
 
 function App() {
